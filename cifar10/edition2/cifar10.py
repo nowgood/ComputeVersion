@@ -81,7 +81,6 @@ TOWER_NAME = 'tower'
 DATA_URL = 'https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz'
 
 
-
 def distorted_inputs():
   """Construct distorted input for CIFAR training using the Reader ops.
 
@@ -102,69 +101,6 @@ def distorted_inputs():
     labels = tf.cast(labels, tf.float16)
   return images, labels
 
-
-def batch_norm(input, training):
-    input = tf.layers.batch_normalization(input, momentum=MOVING_AVERAGE_DECAY, training=training,
-                                          epsilon=EPSILON, axis=-1, center=True, scale=True)
-    return tf.nn.relu(input)
-
-
-def _bottleneck_block(input, filters, training=False, projection=None, name=None):
-    shortcut = input
-    filters_out = 4 * filters
-    input = batch_norm(input, training)
-
-    if projection:
-        shortcut = input
-
-    input = tf.layers.conv2d(input, kernel_size=1, filters=filters, strides=1, padding='SAME')
-    input = batch_norm(input, training)
-
-    input = tf.layers.conv2d(input, kernel_size=3, strides=1, filters=filters, padding='SAME')
-    input = batch_norm(input, training)
-
-    input = tf.layers.conv2d(input, filters=filters_out, kernel_size=1, strides=1, padding='SAME')
-
-    input = input + shortcut
-    return tf.identity(input)
-
-
-def build_layer(input, blocks, training, filters):
-
-    def projection(input):
-        return tf.layers.conv2d(input, filters * 4, kernel_size=1, strides=1, padding='SAME')
-
-    input = projection(input)
-    for i in range(1, blocks):
-        input = _bottleneck_block(input, filters=filters, training=training)
-
-    return tf.identity(input)
-
-
-def inference(image, training=False):
-
-    input = tf.layers.conv2d(image, filters=32, kernel_size=3, strides=1)
-    input = batch_norm(input, training)
-
-    input = tf.layers.conv2d(input, filters=32, kernel_size=3, strides=2)
-    input = batch_norm(input, training)
-
-    input = build_layer(input, blocks=2, training=training, filters=64)
-    input = build_layer(input, blocks=4, training=training, filters=128)
-    input = build_layer(input, blocks=2, training=training, filters=256)
-
-    input = batch_norm(input, training)
-    shape = input.get_shape().as_list()
-    ave_pool_size = shape[2]
-    input = tf.layers.average_pooling2d(input, pool_size=ave_pool_size, strides=1)
-    input = tf.identity(input)
-
-    # 很重要的一步
-    input = tf.reshape(input, [-1, shape[-1]])
-    input = tf.layers.dense(input, units=NUM_CLASSES)
-    input = tf.identity(input)
-
-    return input
 
 def inputs(eval_data):
   """Construct input for CIFAR evaluation using the Reader ops.
@@ -191,8 +127,77 @@ def inputs(eval_data):
   return images, labels
 
 
+def batch_norm(input, training):
+    input = tf.layers.batch_normalization(input, momentum=MOVING_AVERAGE_DECAY, training=training,
+                                          epsilon=EPSILON, axis=-1, center=True, scale=True)
+    return tf.nn.relu(input)
 
-def loss(logits, labels):
+
+def _bottleneck_block(input, filters, training=False, projection=None, name=None):
+    shortcut = input
+    filters_out = 4 * filters
+    input = batch_norm(input, training)
+
+    if projection:
+        shortcut = input
+
+    input = tf.layers.conv2d(input, kernel_size=1, filters=filters, strides=1, padding='SAME', use_bias=False,
+                             kernel_initializer=tf.variance_scaling_initializer)
+    input = batch_norm(input, training)
+
+    input = tf.layers.conv2d(input, kernel_size=3, strides=1, filters=filters, padding='SAME', use_bias=False,
+                             kernel_initializer=tf.variance_scaling_initializer)
+    input = batch_norm(input, training)
+
+    input = tf.layers.conv2d(input, filters=filters_out, kernel_size=1, strides=1, padding='SAME', use_bias=False,
+                             kernel_initializer=tf.variance_scaling_initializer)
+
+    input = input + shortcut
+    return tf.identity(input)
+
+
+def build_layer(input, blocks, training, filters):
+
+    def projection(input):
+        return tf.layers.conv2d(input, filters * 4, kernel_size=1, strides=1, padding='SAME', use_bias=False,
+                                kernel_initializer=tf.variance_scaling_initializer)
+
+    input = projection(input)
+    for i in range(1, blocks):
+        input = _bottleneck_block(input, filters=filters, training=training)
+
+    return tf.identity(input)
+
+
+def inference(image, training=False):
+
+    input = tf.layers.conv2d(image, filters=32, kernel_size=3, strides=1, use_bias=False,
+                             kernel_initializer=tf.variance_scaling_initializer)
+    input = batch_norm(input, training)
+
+    input = tf.layers.conv2d(input, filters=32, kernel_size=3, strides=2, use_bias=False,
+                             kernel_initializer=tf.variance_scaling_initializer)
+    input = batch_norm(input, training)
+
+    input = build_layer(input, blocks=2, training=training, filters=64)
+    input = build_layer(input, blocks=4, training=training, filters=128)
+    input = build_layer(input, blocks=2, training=training, filters=256)
+
+    input = batch_norm(input, training)
+    shape = input.get_shape().as_list()
+    ave_pool_size = shape[2]
+    input = tf.layers.average_pooling2d(input, pool_size=ave_pool_size, strides=1)
+    input = tf.identity(input)
+
+    # 很重要的一步
+    input = tf.reshape(input, [-1, shape[-1]])
+    input = tf.layers.dense(input, units=NUM_CLASSES)
+    input = tf.identity(input)
+
+    return input
+
+
+def loss(logits, labels, weight_decay):
   """Add L2Loss to all the trainable variables.
 
   Add summary for "Loss" and "Loss/avg".
@@ -209,10 +214,10 @@ def loss(logits, labels):
   cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
       labels=labels, logits=logits, name='cross_entropy_per_example')
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-
-  # The total loss is defined as the cross entropy loss plus all of the weight
-  # decay terms (L2 loss).
-  return cross_entropy_mean
+  total_loss = cross_entropy_mean + weight_decay * tf.add_n([tf.nn.l2_loss(v)]
+                                                            for v in tf.trainable_variables())
+  tf.summary.scalar(total_loss, "Loss")
+  return total_loss
 
 
 def train(loss, global_step):

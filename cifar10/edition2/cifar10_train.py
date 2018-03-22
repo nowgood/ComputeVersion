@@ -54,7 +54,7 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
 tf.app.flags.DEFINE_integer('log_frequency', 10,
                             """How often to log results to the console.""")
-
+WEIGHT_DECAY = 0.0002
 
 def train(training=True):
   """Train CIFAR-10 for a number of steps."""
@@ -72,7 +72,7 @@ def train(training=True):
     logits = cifar10.inference(images, training=training)
 
     # Calculate loss.
-    loss = cifar10.loss(logits, labels)
+    loss = cifar10.loss(logits, labels, weight_decay=WEIGHT_DECAY)
 
     # Build a Graph that trains the model with one batch of examples and
     # updates the model parameters.
