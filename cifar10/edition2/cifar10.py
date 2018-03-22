@@ -43,7 +43,7 @@ import tarfile
 from six.moves import urllib
 import tensorflow as tf
 
-from edition1 import cifar10_input
+import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -121,8 +121,8 @@ def distorted_inputs():
   return images, labels
 
 
-def batch_norm(input, is_training):
-    input = tf.layers.batch_normalization(input, momentum=MOVING_AVERAGE_DECAY, is_training=is_training,
+def batch_norm(input, training):
+    input = tf.layers.batch_normalization(input, momentum=MOVING_AVERAGE_DECAY, training=training,
                                           epsilon=EPSILON, axis=-1, center=True, scale=True)
     return tf.nn.relu(input)
 
@@ -177,6 +177,7 @@ def inference(image, training=False):
     input = tf.layers.average_pooling2d(input, pool_size=ave_pool_size, strides=1)
     input = tf.identity(input)
 
+    input = tf.reshape(input, [-1, shape[-1]])
     input = tf.layers.dense(input, units=NUM_CLASSES)
     input = tf.identity(input)
 
@@ -228,9 +229,10 @@ def loss(logits, labels):
 
   # The total loss is defined as the cross entropy loss plus all of the weight
   # decay terms (L2 loss).
-  return cross_entropy
+  return cross_entropy_mean
 
-def train(global_step):
+
+def train(loss, global_step):
   """Train CIFAR-10 model.
 
   Create an optimizer and apply to all trainable variables. Add moving
@@ -260,32 +262,26 @@ def train(global_step):
 
   # Compute gradients.
 
-  loss = loss()
   opt = tf.train.GradientDescentOptimizer(lr)
-  grads = opt.compute_gradients(total_loss)
+  grads = opt.compute_gradients(loss)
 
   # Apply gradients.
   apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
-  # Add histograms for trainable variables.
-  for var in tf.trainable_variables():
-    tf.summary.histogram(var.op.name, var)
-
-  # Add histograms for gradients.
-  for grad, var in grads:
-    if grad is not None:
-      tf.summary.histogram(var.op.name + '/gradients', grad)
 
   # Track the moving averages of all trainable variables.
   variable_averages = tf.train.ExponentialMovingAverage(
       MOVING_AVERAGE_DECAY, global_step)
   variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
-  update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-  with tf.control_dependencies([apply_gradient_op, variables_averages_op, update_ops]):
+
+  with tf.control_dependencies([apply_gradient_op, variables_averages_op]):
     train_op = tf.no_op(name='train')
 
-  return train_op
+  update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+  with tf.control_dependencies(update_ops):
+      train_op_1 = tf.no_op(name='train')
+  return train_op_1
 
 
 def maybe_download_and_extract():
