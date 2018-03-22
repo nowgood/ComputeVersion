@@ -48,7 +48,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('train_dir', 'D:\ComputeVision\cifar10_train',
                            """Directory where to write event logs """
                            """and checkpoint.""")
-tf.app.flags.DEFINE_integer('max_steps', 1000000,
+tf.app.flags.DEFINE_integer('max_steps', 100000,
                             """Number of batches to run.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
@@ -76,6 +76,7 @@ def train(training=True):
 
     # Build a Graph that trains the model with one batch of examples and
     # updates the model parameters.
+
     train_op = cifar10.train(loss, global_step)
 
     class _LoggerHook(tf.train.SessionRunHook):

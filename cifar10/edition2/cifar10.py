@@ -81,24 +81,6 @@ TOWER_NAME = 'tower'
 DATA_URL = 'https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz'
 
 
-def _activation_summary(x):
-  """Helper to create summariefs or activations.
-
-  Creates a summary that provides a histogram of activations.
-  Creates a summary that measures the sparsity of activations.
-
-  Args:
-    x: Tensor
-  Returns:
-    nothing
-  """
-  # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
-  # session. This helps the clarity of presentation on tensorboard.
-  tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
-  tf.summary.histogram(tensor_name + '/activations', x)
-  tf.summary.scalar(tensor_name + '/sparsity',
-                                       tf.nn.zero_fraction(x))
-
 
 def distorted_inputs():
   """Construct distorted input for CIFAR training using the Reader ops.
@@ -177,6 +159,7 @@ def inference(image, training=False):
     input = tf.layers.average_pooling2d(input, pool_size=ave_pool_size, strides=1)
     input = tf.identity(input)
 
+    # 很重要的一步
     input = tf.reshape(input, [-1, shape[-1]])
     input = tf.layers.dense(input, units=NUM_CLASSES)
     input = tf.identity(input)
@@ -233,23 +216,9 @@ def loss(logits, labels):
 
 
 def train(loss, global_step):
-  """Train CIFAR-10 model.
 
-  Create an optimizer and apply to all trainable variables. Add moving
-  average for all trainable variables.
-
-  Args:
-    total_loss: Total loss from loss().
-    global_step: Integer Variable counting the number of training steps
-      processed.
-  Returns:
-    train_op: op for training.
-  """
-  # Variables that affect learning rate.
   num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
   decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
-
-  # Decay the learning rate exponentially based on the number of steps.
   lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
                                   global_step,
                                   decay_steps,
@@ -257,31 +226,20 @@ def train(loss, global_step):
                                   staircase=True)
   tf.summary.scalar('learning_rate', lr)
 
-  # Generate moving averages of all losses and associated summaries.
-
-
-  # Compute gradients.
-
   opt = tf.train.GradientDescentOptimizer(lr)
-  grads = opt.compute_gradients(loss)
-
-  # Apply gradients.
-  apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
-
+  update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+  with tf.control_dependencies(update_ops):
+      train_op = opt.minimize(loss, global_step=global_step)
 
   # Track the moving averages of all trainable variables.
   variable_averages = tf.train.ExponentialMovingAverage(
       MOVING_AVERAGE_DECAY, global_step)
   variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
-
-  with tf.control_dependencies([apply_gradient_op, variables_averages_op]):
+  with tf.control_dependencies([train_op, variables_averages_op]):
     train_op = tf.no_op(name='train')
 
-  update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-  with tf.control_dependencies(update_ops):
-      train_op_1 = tf.no_op(name='train')
-  return train_op_1
+  return train_op
 
 
 def maybe_download_and_extract():
