@@ -48,7 +48,7 @@ import cifar10_input
 FLAGS = tf.app.flags.FLAGS
 
 # Basic model parameters.
-tf.app.flags.DEFINE_integer('batch_size', 512,
+tf.app.flags.DEFINE_integer('batch_size', 128,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_string('data_dir', 'D:\ComputeVision\cifar10_data',
                            """Path to the CIFAR-10 data directory.""")
@@ -64,7 +64,7 @@ NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
 # Constants describing the training process.
 MOVING_AVERAGE_DECAY = 0.99    # The decay to use for the moving average.
-NUM_EPOCHS_PER_DECAY = 50.0      # Epochs after which learning rate decays.
+NUM_EPOCHS_PER_DECAY = 200.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 
@@ -214,9 +214,9 @@ def loss(logits, labels, weight_decay):
   cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
       labels=labels, logits=logits, name='cross_entropy_per_example')
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-  total_loss = cross_entropy_mean + weight_decay * tf.add_n([tf.nn.l2_loss(v)]
-                                                            for v in tf.trainable_variables())
-  tf.summary.scalar(total_loss, "Loss")
+  total_loss = cross_entropy_mean + weight_decay * tf.add_n([tf.nn.l2_loss(v)
+                                                            for v in tf.trainable_variables()])
+  tf.summary.scalar("myLoss", total_loss)
   return total_loss
 
 
