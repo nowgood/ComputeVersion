@@ -56,7 +56,7 @@ tf.app.flags.DEFINE_integer('log_frequency', 10,
                             """How often to log results to the console.""")
 
 
-def train():
+def train(training=True):
   """Train CIFAR-10 for a number of steps."""
   with tf.Graph().as_default():
     global_step = tf.train.get_or_create_global_step()
@@ -69,7 +69,7 @@ def train():
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
-    logits = cifar10.inference(images)
+    logits = cifar10.inference(images, training=training)
 
     # Calculate loss.
     loss = cifar10.loss(logits, labels)
