@@ -216,7 +216,7 @@ def loss(logits, labels, weight_decay):
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
   total_loss = cross_entropy_mean + weight_decay * tf.add_n([tf.nn.l2_loss(v)
                                                             for v in tf.trainable_variables()])
-  tf.summary.scalar(total_loss, "Loss")
+  tf.summary.scalar("loss", total_loss)
   return total_loss
 
 
