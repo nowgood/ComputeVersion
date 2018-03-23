@@ -27,7 +27,7 @@ import tensorflow as tf
 # Process images of this size. Note that this differs from the original CIFAR
 # image size of 32 x 32. If one alters this number, then the entire model
 # architecture will change and any model would need to be retrained.
-IMAGE_SIZE = 24
+IMAGE_SIZE = 32
 
 # Global constants describing the CIFAR-10 data set.
 NUM_CLASSES = 10
@@ -172,8 +172,11 @@ def distorted_inputs(data_dir, batch_size):
     # Image processing for training the network. Note the many random
     # distortions applied to the image.
 
+    # Resize the image to add four extra pixels on each side.
+    distorted_image = tf.image.resize_image_with_crop_or_pad(reshaped_image, height + 8, width + 8)
+
     # Randomly crop a [height, width] section of the image.
-    distorted_image = tf.random_crop(reshaped_image, [height, width, 3])
+    distorted_image = tf.random_crop(distorted_image, [height, width, 3])
 
     # Randomly flip the image horizontally.
     distorted_image = tf.image.random_flip_left_right(distorted_image)
@@ -189,7 +192,7 @@ def distorted_inputs(data_dir, batch_size):
     min_fraction_of_examples_in_queue = 0.4
     min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN *
                              min_fraction_of_examples_in_queue)
-    print ('Filling queue with %d CIFAR images before starting to train. '
+    print('Filling queue with %d CIFAR images before starting to train. '
            'This will take a few minutes.' % min_queue_examples)
 
   # Generate a batch of images and labels by building up a queue of examples.
