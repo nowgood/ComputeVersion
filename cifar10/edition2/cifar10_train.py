@@ -56,6 +56,7 @@ tf.app.flags.DEFINE_integer('log_frequency', 100,
                             """How often to log results to the console.""")
 WEIGHT_DECAY = 0.0002
 
+
 def train(training=True):
   """Train CIFAR-10 for a number of steps."""
   with tf.Graph().as_default():
